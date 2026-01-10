@@ -118,7 +118,7 @@ class AnalyzeNetwork:
     def get_info(self):
         """returns a list of dicts with information about every
         device in the pcap"""
-        devices = set()
+        devices = {}
         for packet in self.packets:
             eth_header = None
             if "Ether" in packet:
@@ -129,12 +129,19 @@ class AnalyzeNetwork:
                 eth_header = "cooked linux"
             for atr in ("dst", "src"):
                 device = {}
+                device["User-Agent"] = "UNKNOWN"
+                device["Server"] = "UNKNOWN"
                 if atr == "src":
                     if Raw in packet:
-                        if "User-Agent" in packet[Raw].load.decode('utf-8', errors='ignore'):
-                            for info in packet["Raw"].load.decode('utf-8', errors='ignore').split("\n"):
+                        raw = packet[Raw].load.decode('utf-8', errors='ignore')
+                        if "User-Agent" in raw:
+                            for info in raw.split("\n"):
                                 if "User-Agent" in info:
                                     device["User-Agent"] = info[12:]
+                        if "Server:" in raw and "HTTP" in raw and "OK" in raw:
+                            for info in raw.split("\n"):
+                                if "Server:" in info:
+                                    device["Server"] = info[7:]
                 if eth_header != None:
                     device["MAC"] = getattr(packet[eth_header], atr)
                     if device["MAC"] == "ff:ff:ff:ff:ff:ff":
@@ -147,9 +154,18 @@ class AnalyzeNetwork:
                         device["VENDOR"] = self.get_vendor(device["MAC"])
                     except KeyError:
                         device["VENDOR"] = "UNKNOWN"
-                    devices.add(frozenset(device.items()))
+                    if device["MAC"] not in devices:
+                        devices[device["MAC"]] = {"MAC":device["MAC"]}
+                    if device["VENDOR"] != "UNKNOWN":
+                        devices[device["MAC"]]["VENDOR"] = device["VENDOR"]
+                    if device["IP"] != "UNKNOWN":
+                        devices[device["MAC"]]["IP"] = device["IP"]
+                    if device["User-Agent"] != "UNKNOWN":
+                        devices[device["MAC"]]["User-Agent"] = device["User-Agent"]
+                    if device["Server"] != "UNKNOWN":
+                        devices[device["MAC"]]["Server"] = device["Server"].strip("\r")
         self.save_cache()
-        return [dict(d) for d in devices]
+        return [devices[d] for d in devices]
 
 
     def __repr__(self):
@@ -180,8 +196,6 @@ class AnalyzeNetwork:
                                 return ["windows"] # only windows uses this payload
                             else:
                                 n_win = True
-
-
         if num == 0:
             if n_win:
                 return ["linux", "macOS", "unix"]
