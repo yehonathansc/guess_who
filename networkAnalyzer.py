@@ -213,7 +213,8 @@ class AnalyzeNetwork:
             return ["linux", "macOS", "unix"]
         return ["unknown"]
 
-if __name__ == "__main__":
+
+def test():
     print("pcap-00.pcapng:")
     analyzer = AnalyzeNetwork("pcap-00.pcapng")
     for device in analyzer.get_info():
@@ -235,3 +236,7 @@ if __name__ == "__main__":
     for device in analyzer.get_info():
         print(device)
         print(analyzer.guess_os(device))
+
+
+if __name__ == "__main__":
+    test()
